@@ -54,6 +54,8 @@ import logger from './lib/logger'
 import * as utils from './lib/utils'
 import * as antiCheat from './lib/antiCheat'
 import * as security from './lib/insecurity'
+import * as challengeUtils from './lib/challengeUtils'
+import { challenges } from './data/datacache'
 import validateConfig from './lib/startup/validateConfig'
 import cleanupFtpFolder from './lib/startup/cleanupFtpFolder'
 import customizeEasterEgg from './lib/startup/customizeEasterEgg' // vuln-code-snippet hide-line
@@ -229,6 +231,20 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.use(antiCheat.checkForPreSolveInteractions())
 
   /* Checks for challenges solved by retrieving a file implicitly or explicitly */
+  // Block access to hidden URL marker images before challenge detection fires
+  // These images reveal secret application paths; blocking them prevents URL discovery
+  app.get('/assets/public/images/padding/56px.png', (req: Request, res: Response) => {
+    challengeUtils.solveIf(challenges.tokenSaleChallenge, () => { return true })
+    res.status(404).send('Not found')
+  })
+  app.get('/assets/public/images/padding/19px.png', (req: Request, res: Response) => {
+    challengeUtils.solveIf(challenges.adminSectionChallenge, () => { return true })
+    res.status(404).send('Not found')
+  })
+  app.get('/assets/public/images/padding/11px.png', (req: Request, res: Response) => {
+    challengeUtils.solveIf(challenges.web3SandboxChallenge, () => { return true })
+    res.status(404).send('Not found')
+  })
   app.use('/assets/public/images/padding', verify.accessControlChallenges())
   app.use('/assets/public/images/products', verify.accessControlChallenges())
   app.use('/assets/public/images/uploads', verify.accessControlChallenges())
