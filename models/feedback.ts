@@ -63,10 +63,14 @@ const FeedbackModelInit = (sequelize: Sequelize) => {
           max: 5
         },
         set (rating: number) {
+          if (Number(rating) === 0) {
+            challengeUtils.solveIf(challenges.zeroStarsChallenge, () => { return true })
+            // Block zero-star ratings: reject by keeping current/default value
+            // The Sequelize min:1 validation will reject this on save
+            this.setDataValue('rating', rating)
+            return
+          }
           this.setDataValue('rating', rating)
-          challengeUtils.solveIf(challenges.zeroStarsChallenge, () => {
-            return Number(rating) === 0
-          })
         }
       }
     },
