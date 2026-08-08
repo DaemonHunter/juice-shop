@@ -52,8 +52,11 @@ export function retrieveLoggedInUser () {
     // Solve passwordHashLeakChallenge when password field is included in response
     challengeUtils.solveIf(challenges.passwordHashLeakChallenge, () => response?.user?.password)
 
-    // Detect and block JSONP-based email leak
-    challengeUtils.solveIf(challenges.emailLeakChallenge, () => { return req.query.callback !== undefined })
+    // Block JSONP-based email leak attempts
+    if (req.query.callback !== undefined) {
+      res.status(400).json({ error: 'JSONP not supported' })
+      return
+    }
     // Always return JSON (never JSONP) to prevent cross-domain data leakage
     res.json(response)
   }

@@ -444,14 +444,29 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.post('/api/Feedbacks', verify.captchaBypassChallenge())
   /* User registration challenge verifications before finale takes over */
   app.post('/api/Users', (req: Request, res: Response, next: NextFunction) => {
-    if (req.body.email !== undefined && req.body.password !== undefined && req.body.passwordRepeat !== undefined) {
+    // Reject if role=admin is attempted (privilege escalation)
+    if (req.body.role === 'admin' || req.body.role === security.roles.admin) {
+      res.status(400).send(res.__('Role cannot be set during registration.'))
+      return
+    }
+    if (req.body.email !== undefined && req.body.password !== undefined) {
       if (req.body.email.length !== 0 && req.body.password.length !== 0) {
         req.body.email = req.body.email.trim()
         req.body.password = req.body.password.trim()
-        req.body.passwordRepeat = req.body.passwordRepeat.trim()
+        if (req.body.passwordRepeat !== undefined) req.body.passwordRepeat = req.body.passwordRepeat.trim()
+        // Enforce password strength: min 8 chars, at least 1 digit, 1 special char
+        const pwd: string = req.body.password
+        if (pwd.length < 8 || !/\d/.test(pwd) || !/[^a-zA-Z0-9]/.test(pwd)) {
+          res.status(400).send(res.__('Password must be at least 8 characters and contain a digit and a special character.'))
+          return
+        }
       } else {
         res.status(400).send(res.__('Invalid email/password cannot be empty'))
+        return
       }
+    } else if (req.body.email === '' || req.body.password === '') {
+      res.status(400).send(res.__('Invalid email/password cannot be empty'))
+      return
     }
     next()
   })
@@ -474,17 +489,9 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.delete('/api/Quantitys/:id', security.denyAll())
   app.post('/api/Quantitys', security.denyAll())
   app.use('/api/Quantitys/:id', security.isAccounting(), IpFilter(['123.456.789'], { mode: 'allow' }))
-  /* Feedbacks: Do not allow changes of existing feedback */
+  /* Feedbacks: Do not allow changes or deletion of existing feedback */
   app.put('/api/Feedbacks/:id', security.denyAll())
-  app.delete('/api/Feedbacks/:id', (req: Request, res: Response, next: NextFunction) => {
-    const token = utils.jwtFrom(req)
-    const decoded = token ? security.decode(token) as { data?: { role?: string } } : undefined
-    if (decoded?.data?.role !== security.roles.admin) {
-      res.status(403).json({ error: 'Admin role required to delete feedback' })
-      return
-    }
-    next()
-  })
+  app.delete('/api/Feedbacks/:id', security.denyAll())
   /* PrivacyRequests: Only allowed for authenticated users */
   app.use('/api/PrivacyRequests', security.isAuthorized())
   app.use('/api/PrivacyRequests/:id', security.isAuthorized())
