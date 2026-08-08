@@ -233,6 +233,8 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.use('/assets/public/images/products', verify.accessControlChallenges())
   app.use('/assets/public/images/uploads', verify.accessControlChallenges())
   app.use('/assets/i18n', verify.accessControlChallenges())
+  // Block access to the Klingon test language file that never made it to production
+  app.get('/assets/i18n/tlh_AA.json', (req: Request, res: Response) => { res.status(404).send('Not found') })
 
   /* Checks for challenges solved by abusing SSTi and SSRF bugs */
   app.use('/solve/challenges/server-side', verify.serverSideChallenges())
